@@ -334,15 +334,44 @@
    sobre la copia local; usa el botón "Recargar desde JSON" para volver a traer
    los datos más recientes (reemplaza el tablero actual).
 
-   - DATA_URL: URL "raw" del archivo (no la de vista "blob").
+   - DATA_URL: URL "raw" del archivo (no la de vista "blob"). LECTURA.
      Vista:  https://github.com/electroplast-sa/Segumiento_Tareas/blob/main/kambam.json
      Raw:    https://raw.githubusercontent.com/electroplast-sa/Segumiento_Tareas/main/kambam.json
+
+   - POWER_AUTOMATE_URL: URL del trigger "When an HTTP request is received"
+     (Power Automate #2). ESCRITURA. El HTML hace POST aquí; Power Automate
+     actualiza el Excel Master. Debe terminar en ".../triggers/manual/paths/invoke?...&sig=...".
+     OJO: si tu URL termina en "/triggers/manual/run" NO es el trigger HTTP, es
+     "Manually trigger a flow" (trigger equivocado). Déjala vacía ('') mientras
+     tanto: el tablero seguirá guardando localmente y avisará que falta el envío.
+
+   Regla de arquitectura: el HTML SOLO hace POST a Power Automate. Nunca escribe
+   en GitHub, ni en el JSON, ni en SharePoint. La fuente de verdad es el Excel.
    =========================================================================== */
 const DATA_URL='https://raw.githubusercontent.com/electroplast-sa/Segumiento_Tareas/main/kambam.json';
+const POWER_AUTOMATE_URL='';   // <-- pega aquí la URL del trigger HTTP cuando la tengas
 const KEY='ep_tareas_reuniones_v1';
+const USER_KEY='ep_usuario_actual';
+
+// Mapeo de STATUS entre el tablero (columnas) y el Excel Master.
+// Entrada (JSON de Excel) -> valor interno de la columna del tablero.
+const STATUS_IN={pendiente:'pendiente',proceso:'proceso',finalizada:'completada',
+                 completada:'completada',completado:'completada',finalizado:'completada'};
+// Valor interno -> valor normalizado que espera el Excel (STATUS definitivo).
+const STATUS_OUT={pendiente:'pendiente',proceso:'proceso',completada:'finalizada'};
 
 let tasks=[];
 let editingId=null;
+
+// Identidad para el campo updated_by (se pregunta una vez y se recuerda).
+function getUser(){
+  let u=''; try{u=localStorage.getItem(USER_KEY)||'';}catch(e){}
+  if(!u){
+    u=(prompt('¿Tu nombre o correo? Se registrará como responsable del cambio (updated_by).')||'').trim();
+    if(u){try{localStorage.setItem(USER_KEY,u);}catch(e){}}
+  }
+  return u||'anónimo';
+}
 
 /* ---- Persistencia local --------------------------------------------------- */
 function save(){
@@ -382,8 +411,50 @@ function normalize(raw){
       prio:    ['alta','media','baja'].includes(String(r.prio||'').toLowerCase())?String(r.prio).toLowerCase():'media',
       meet:    r.meet||'',
       meetdate:serialToISO(r.meetdate),
-      status:  ['pendiente','proceso','completada'].includes(String(r.status||'').toLowerCase())?String(r.status).toLowerCase():'pendiente'
+      status:  STATUS_IN[String(r.status||'').toLowerCase()]||'pendiente'
     }));
+}
+
+/* ---- Envío a Power Automate #2 (única vía de escritura) --------------------
+   Construye el objeto según el ESQUEMA JSON DEFINITIVO del proyecto y lo envía
+   por POST. NO incluye updated_at ni sync_status: esos los controla Power
+   Automate (utcNow() y SINCRONIZADO/PENDIENTE/ERROR).
+   --------------------------------------------------------------------------- */
+function buildPayload(t,deletedFlag){
+  return {
+    id:       t.id,
+    title:    t.title,
+    desc:     t.desc||'',
+    resp:     t.resp||'',
+    due:      t.due||'',
+    prio:     t.prio,                          // alta | media | baja
+    meet:     t.meet||'',
+    meetdate: t.meetdate||'',
+    status:   STATUS_OUT[t.status]||t.status,  // pendiente | proceso | finalizada
+    updated_by: getUser(),
+    deleted:  deletedFlag||'no'                // no | si
+  };
+}
+async function syncToExcel(payload){
+  if(!POWER_AUTOMATE_URL){
+    setSync('warn','Guardado local · configura POWER_AUTOMATE_URL para enviar al Excel');
+    return false;
+  }
+  setSync('loading','Enviando al Excel…');
+  try{
+    const res=await fetch(POWER_AUTOMATE_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    setSync('ok','Enviado al Excel '+nowTime()+' · el JSON se refresca en ~1 min');
+    return true;
+  }catch(e){
+    console.error('[Seguimiento] Error al enviar a Power Automate #2:',e);
+    setSync('err','No se pudo enviar al Excel — queda guardado local (pendiente)');
+    return false;
+  }
 }
 
 /* ---- Lectura del JSON desde GitHub ---------------------------------------- */
@@ -426,7 +497,8 @@ async function reloadFromGitHub(){
   }
 }
 function setSync(state,text){
-  const led=$('#sync-led'); led.className='led'+(state==='loading'?' loading':state==='err'?' err':'');
+  const led=$('#sync-led');
+  led.className='led'+(state==='loading'?' loading':state==='err'?' err':state==='warn'?' loading':'');
   $('#sync-text').textContent=text;
 }
 function nowTime(){
@@ -544,7 +616,10 @@ document.querySelectorAll('.col-body').forEach(body=>{
     e.preventDefault();body.classList.remove('drag-over');
     const id=e.dataTransfer.getData('text/plain');
     const t=tasks.find(x=>x.id===id);
-    if(t && t.status!==body.dataset.col){t.status=body.dataset.col;save();render();}
+    if(t && t.status!==body.dataset.col){
+      t.status=body.dataset.col;save();render();
+      syncToExcel(buildPayload(t,'no'));   // el cambio de estado también va al Excel
+    }
   });
 });
 
@@ -589,17 +664,23 @@ function saveTask(){
     meetdate:$('#f-meetdate').value,
     status:$('#f-status').value,
   };
+  let t;
   if(editingId){
-    const t=tasks.find(x=>x.id===editingId);Object.assign(t,data);
+    t=tasks.find(x=>x.id===editingId);Object.assign(t,data);
   }else{
-    tasks.unshift({id:uid(),...data});
+    t={id:uid(),...data};tasks.unshift(t);
   }
   save();render();closeModal();
+  syncToExcel(buildPayload(t,'no'));   // enviar a Power Automate #2 -> Excel
 }
 function delTask(id){
   const t=tasks.find(x=>x.id===id);
-  if(!confirm('¿Eliminar la tarea "'+(t?t.title:'')+'"?')) return;
-  tasks=tasks.filter(x=>x.id!==id);save();render();closeModal();
+  if(!t) return;
+  // Borrado LÓGICO: no se elimina del Excel, se marca deleted = "si".
+  if(!confirm('¿Ocultar la tarea "'+t.title+'"?\nSe marcará como eliminada en el Excel (no se borra físicamente).')) return;
+  closeModal();
+  syncToExcel(buildPayload(t,'si'));   // avisar al Excel que quedó oculta
+  tasks=tasks.filter(x=>x.id!==id);save();render();   // quitar de la vista local
 }
 
 // Export / import
