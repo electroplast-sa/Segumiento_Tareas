@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Tablero Kanban para dar seguimiento a las tareas operativas de las reuniones de equipo — Electroplast.">
+<meta name="theme-color" content="#0f1729">
+<title>Seguimiento de Tareas · Reuniones de Equipo</title>
+<style>
+  :root{
+    --bg:#0f1729;
+    --bg-soft:#16213e;
+    --panel:#1b2745;
+    --panel-2:#213154;
+    --line:#2c3d63;
+    --txt:#e8edf7;
+    --txt-dim:#9fb0d0;
+    --txt-faint:#6b7ba0;
+    --accent:#5b8def;
+    --accent-soft:#2a3f6b;
+    --pend:#f2b34b;
+    --proc:#5b8def;
+    --done:#3ecf8e;
+    --alta:#ff6b6b;
+    --media:#f2b34b;
+    --baja:#7aa2f7;
+    --danger:#ff6b6b;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+    --radius:14px;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 600px at 20% -10%,#1c2a4d 0%,transparent 60%),
+               radial-gradient(1000px 500px at 100% 0%,#20213e 0%,transparent 55%),
+               var(--bg);
+    color:var(--txt);
+    min-height:100vh;
+    padding:26px 22px 60px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1280px;margin:0 auto}
+
+  /* Header */
+  header.top{
+    display:flex;align-items:flex-start;justify-content:space-between;
+    gap:20px;flex-wrap:wrap;margin-bottom:22px;
+  }
+  .brand h1{font-size:1.6rem;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+  .brand .dot{width:12px;height:12px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#8b5bef);box-shadow:0 0 14px var(--accent)}
+  .brand p{color:var(--txt-dim);font-size:.9rem;margin-top:6px;max-width:520px}
+
+  .stats{display:flex;gap:12px;flex-wrap:wrap}
+  .stat{
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:10px 16px;min-width:96px;text-align:center;
+  }
+  .stat .num{font-size:1.5rem;font-weight:700;line-height:1}
+  .stat .lbl{font-size:.68rem;color:var(--txt-faint);text-transform:uppercase;letter-spacing:.08em;margin-top:5px}
+  .stat.total .num{color:var(--txt)}
+  .stat.p .num{color:var(--pend)}
+  .stat.i .num{color:var(--proc)}
+  .stat.d .num{color:var(--done)}
+  .stat.late .num{color:var(--danger)}
+
+  /* Toolbar */
+  .toolbar{
+    display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:12px;margin-bottom:20px;
+  }
+  .toolbar .search{position:relative;flex:1;min-width:200px}
+  .toolbar .search input{
+    width:100%;background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;
+    color:var(--txt);padding:10px 12px 10px 36px;font-size:.9rem;
+  }
+  .toolbar .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:.5}
+  select,.btn{
+    background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;
+    color:var(--txt);padding:10px 12px;font-size:.88rem;cursor:pointer;transition:.15s;
+  }
+  select:hover,.btn:hover{border-color:var(--accent)}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),#6a5bef);border:none;font-weight:600;padding:10px 18px}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .btn.ghost{background:transparent}
+  .spacer{flex:1}
+
+  /* Barra de origen de datos */
+  .syncbar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    margin-bottom:16px;font-size:.8rem;color:var(--txt-dim);
+  }
+  .syncbar .pill{
+    display:inline-flex;align-items:center;gap:7px;background:var(--panel);
+    border:1px solid var(--line);border-radius:20px;padding:6px 12px;
+  }
+  .syncbar .led{width:8px;height:8px;border-radius:50%;background:var(--done);box-shadow:0 0 8px var(--done)}
+  .syncbar .led.loading{background:var(--pend);box-shadow:0 0 8px var(--pend);animation:pulse 1s infinite}
+  .syncbar .led.err{background:var(--danger);box-shadow:0 0 8px var(--danger)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  /* Board */
+  .board{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:900px){.board{grid-template-columns:1fr}}
+  .col{
+    background:linear-gradient(180deg,var(--bg-soft),rgba(22,33,62,.4));
+    border:1px solid var(--line);border-radius:var(--radius);
+    display:flex;flex-direction:column;min-height:220px;
+  }
+  .col-head{
+    display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:1px solid var(--line);
+    position:sticky;top:0;
+  }
+  .col-head .tag{width:10px;height:10px;border-radius:50%}
+  .col-head h2{font-size:.95rem;font-weight:600;letter-spacing:.01em}
+  .col-head .count{margin-left:auto;background:var(--panel-2);color:var(--txt-dim);
+    font-size:.75rem;font-weight:600;padding:2px 9px;border-radius:20px;min-width:26px;text-align:center}
+  .col[data-col="pendiente"] .tag{background:var(--pend)}
+  .col[data-col="proceso"] .tag{background:var(--proc)}
+  .col[data-col="completada"] .tag{background:var(--done)}
+  .col-body{padding:12px;display:flex;flex-direction:column;gap:11px;flex:1;overflow:visible}
+  .col-body.drag-over{background:rgba(91,141,239,.08);border-radius:10px}
+  .col-empty{color:var(--txt-faint);font-size:.82rem;text-align:center;padding:26px 10px;border:1.5px dashed var(--line);border-radius:10px}
+
+  /* Card */
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line);
+    border-radius:11px;padding:12px 13px;cursor:grab;transition:.15s;position:relative;
+  }
+  .card:hover{border-color:var(--accent-soft);transform:translateY(-1px);box-shadow:var(--shadow)}
+  .card.dragging{opacity:.45;cursor:grabbing}
+  .card.prio-alta{border-left-color:var(--alta)}
+  .card.prio-media{border-left-color:var(--media)}
+  .card.prio-baja{border-left-color:var(--baja)}
+  .card .title{font-size:.94rem;font-weight:600;line-height:1.35;padding-right:20px;word-break:break-word}
+  .card .desc{font-size:.8rem;color:var(--txt-dim);margin-top:5px;line-height:1.4;word-break:break-word}
+  .card .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+  .chip{
+    display:inline-flex;align-items:center;gap:5px;font-size:.72rem;
+    background:var(--bg-soft);border:1px solid var(--line);border-radius:20px;padding:3px 9px;color:var(--txt-dim);
+  }
+  .chip.prio{font-weight:600}
+  .chip.prio.alta{background:rgba(255,107,107,.14);border-color:rgba(255,107,107,.4);color:#ff9a9a}
+  .chip.prio.media{background:rgba(242,179,75,.14);border-color:rgba(242,179,75,.4);color:#f7c877}
+  .chip.prio.baja{background:rgba(122,162,247,.14);border-color:rgba(122,162,247,.4);color:#a5c0fb}
+  .chip.date.late{background:rgba(255,107,107,.16);border-color:rgba(255,107,107,.45);color:#ff9a9a;font-weight:600}
+  .chip.date.soon{background:rgba(242,179,75,.14);border-color:rgba(242,179,75,.4);color:#f7c877}
+  .chip .av{width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#8b5bef);
+    color:#fff;font-size:.6rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+  .card .actions{position:absolute;top:9px;right:9px;display:flex;gap:2px;opacity:0;transition:.15s}
+  .card:hover .actions{opacity:1}
+  .icon-btn{background:transparent;border:none;color:var(--txt-faint);cursor:pointer;padding:3px;border-radius:6px;line-height:0}
+  .icon-btn:hover{color:var(--txt);background:var(--panel-2)}
+  .icon-btn.del:hover{color:var(--danger)}
+
+  /* Modal */
+  .overlay{
+    position:fixed;inset:0;background:rgba(6,10,22,.72);backdrop-filter:blur(3px);
+    display:none;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto;
+  }
+  .overlay.open{display:flex}
+  .modal{
+    background:var(--bg-soft);border:1px solid var(--line);border-radius:16px;
+    width:100%;max-width:520px;box-shadow:var(--shadow);animation:pop .18s ease;
+  }
+  @keyframes pop{from{transform:translateY(10px) scale(.98);opacity:0}to{transform:none;opacity:1}}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--line)}
+  .modal-head h3{font-size:1.1rem}
+  .modal-body{padding:20px;display:flex;flex-direction:column;gap:15px}
+  .field label{display:block;font-size:.78rem;color:var(--txt-dim);margin-bottom:6px;font-weight:500}
+  .field input,.field textarea,.field select{
+    width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    color:var(--txt);padding:10px 12px;font-size:.9rem;font-family:inherit;
+  }
+  .field textarea{resize:vertical;min-height:64px}
+  .row{display:flex;gap:12px}
+  .row .field{flex:1}
+  .seg{display:flex;gap:8px}
+  .seg label{flex:1;cursor:pointer}
+  .seg input{display:none}
+  .seg span{display:block;text-align:center;padding:9px;border:1px solid var(--line);border-radius:10px;font-size:.85rem;transition:.15s;color:var(--txt-dim)}
+  .seg input:checked + span{color:#fff;font-weight:600}
+  .seg .a input:checked + span{background:rgba(255,107,107,.2);border-color:var(--alta);color:#ff9a9a}
+  .seg .m input:checked + span{background:rgba(242,179,75,.2);border-color:var(--media);color:#f7c877}
+  .seg .b input:checked + span{background:rgba(122,162,247,.2);border-color:var(--baja);color:#a5c0fb}
+  .modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:16px 20px;border-top:1px solid var(--line)}
+
+  footer.foot{margin-top:30px;text-align:center;color:var(--txt-faint);font-size:.78rem;line-height:1.7}
+  footer.foot a{color:var(--accent);cursor:pointer;text-decoration:none}
+  .hidden{display:none!important}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <h1><span class="dot"></span> Seguimiento de Tareas</h1>
+      <p>Da seguimiento a los pendientes operativos que salen de tus reuniones de equipo. Arrastra las tarjetas entre columnas conforme avanzan.</p>
+    </div>
+    <div class="stats">
+      <div class="stat total"><div class="num" id="s-total">0</div><div class="lbl">Total</div></div>
+      <div class="stat p"><div class="num" id="s-pend">0</div><div class="lbl">Pendientes</div></div>
+      <div class="stat i"><div class="num" id="s-proc">0</div><div class="lbl">En proceso</div></div>
+      <div class="stat d"><div class="num" id="s-done">0</div><div class="lbl">Completadas</div></div>
+      <div class="stat late"><div class="num" id="s-late">0</div><div class="lbl">Vencidas</div></div>
+    </div>
+  </header>
+
+  <div class="syncbar">
+    <span class="pill"><span class="led" id="sync-led"></span><span id="sync-text">Cargando datos…</span></span>
+    <span class="spacer"></span>
+    <button class="btn ghost" id="btn-reload" title="Traer los datos más recientes desde GitHub (reemplaza el tablero actual)">↻ Recargar desde JSON</button>
+  </div>
+
+  <div class="toolbar">
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="search" type="text" placeholder="Buscar tarea, responsable o reunión…">
+    </div>
+    <select id="filter-resp"><option value="">Todos los responsables</option></select>
+    <select id="filter-prio">
+      <option value="">Toda prioridad</option>
+      <option value="alta">Alta</option>
+      <option value="media">Media</option>
+      <option value="baja">Baja</option>
+    </select>
+    <button class="btn ghost" id="btn-export" title="Descargar respaldo">Exportar</button>
+    <button class="btn ghost" id="btn-import" title="Cargar respaldo">Importar</button>
+    <input type="file" id="file-import" accept="application/json" class="hidden">
+    <button class="btn primary" id="btn-new">＋ Nueva tarea</button>
+  </div>
+
+  <div class="board" id="board">
+    <div class="col" data-col="pendiente">
+      <div class="col-head"><span class="tag"></span><h2>Pendiente</h2><span class="count" id="c-pendiente">0</span></div>
+      <div class="col-body" data-col="pendiente"></div>
+    </div>
+    <div class="col" data-col="proceso">
+      <div class="col-head"><span class="tag"></span><h2>En proceso</h2><span class="count" id="c-proceso">0</span></div>
+      <div class="col-body" data-col="proceso"></div>
+    </div>
+    <div class="col" data-col="completada">
+      <div class="col-head"><span class="tag"></span><h2>Completada</h2><span class="count" id="c-completada">0</span></div>
+      <div class="col-body" data-col="completada"></div>
+    </div>
+  </div>
+
+  <footer class="foot">
+    Tus tareas se guardan automáticamente en este navegador. &nbsp;·&nbsp;
+    Usa <a id="foot-export">Exportar</a> para respaldar o compartir el tablero.<br>
+    Hecho para reuniones de equipo — Electroplast.
+  </footer>
+</div>
+
+<!-- Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modal-title">Nueva tarea</h3>
+      <button class="icon-btn" id="btn-close" style="color:var(--txt-dim)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Tarea *</label>
+        <input id="f-title" type="text" placeholder="Ej. Cotizar molde para pieza X" maxlength="120">
+      </div>
+      <div class="field">
+        <label>Detalle (opcional)</label>
+        <textarea id="f-desc" placeholder="Notas o contexto de lo conversado…" maxlength="400"></textarea>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Responsable</label>
+          <input id="f-resp" type="text" placeholder="Nombre" list="resp-list" maxlength="40">
+          <datalist id="resp-list"></datalist>
+        </div>
+        <div class="field">
+          <label>Fecha límite</label>
+          <input id="f-due" type="date">
+        </div>
+      </div>
+      <div class="field">
+        <label>Prioridad</label>
+        <div class="seg">
+          <label class="a"><input type="radio" name="prio" value="alta"><span>Alta</span></label>
+          <label class="m"><input type="radio" name="prio" value="media" checked><span>Media</span></label>
+          <label class="b"><input type="radio" name="prio" value="baja"><span>Baja</span></label>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Reunión de origen</label>
+          <input id="f-meet" type="text" placeholder="Ej. Reunión de producción" list="meet-list" maxlength="60">
+          <datalist id="meet-list"></datalist>
+        </div>
+        <div class="field">
+          <label>Fecha de la reunión</label>
+          <input id="f-meetdate" type="date">
+        </div>
+      </div>
+      <div class="field">
+        <label>Estado</label>
+        <select id="f-status">
+          <option value="pendiente">Pendiente</option>
+          <option value="proceso">En proceso</option>
+          <option value="completada">Completada</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost del hidden" id="btn-delete" style="color:var(--danger)">Eliminar</button>
+      <div class="spacer"></div>
+      <button class="btn ghost" id="btn-cancel">Cancelar</button>
+      <button class="btn primary" id="btn-save">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===========================================================================
+   ALMACENAMIENTO DE DATOS
+   El tablero se puede editar libremente (crear, editar, eliminar, arrastrar) y
+   guarda automáticamente en el navegador (localStorage), con respaldo
+   Exportar/Importar en JSON.
+
+   La CARGA INICIAL se toma del archivo JSON publicado en GitHub (alimentado por
+   Excel/SharePoint vía Power Automate). Después de la primera carga se trabaja
+   sobre la copia local; usa el botón "Recargar desde JSON" para volver a traer
+   los datos más recientes (reemplaza el tablero actual).
+
+   - DATA_URL: URL "raw" del archivo (no la de vista "blob").
+     Vista:  https://github.com/electroplast-sa/Segumiento_Tareas/blob/main/kambam.json
+     Raw:    https://raw.githubusercontent.com/electroplast-sa/Segumiento_Tareas/main/kambam.json
+   =========================================================================== */
+const DATA_URL='https://raw.githubusercontent.com/electroplast-sa/Segumiento_Tareas/main/kambam.json';
+const KEY='ep_tareas_reuniones_v1';
+
+let tasks=[];
+let editingId=null;
+
+/* ---- Persistencia local --------------------------------------------------- */
+function save(){
+  try{localStorage.setItem(KEY,JSON.stringify(tasks));}catch(e){}
+}
+
+/* ---- Normalización de los datos que exporta Excel / Power Automate ---------
+   - Fechas: Excel las manda como número de serie ("46221"). Se convierten a
+     AAAA-MM-DD. Si ya viene como fecha, se respeta.
+   - Se ignoran campos técnicos de OData (@odata.etag, ItemInternalId).
+   - Se ocultan los registros marcados como eliminados (deleted = "si").
+   --------------------------------------------------------------------------- */
+function serialToISO(v){
+  if(v===null||v===undefined||v==='') return '';
+  const s=String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);   // ya es fecha
+  const n=Number(s);
+  if(!isFinite(n)) return '';
+  const ms=Math.round((n-25569)*86400000);                // serie Excel (base 1899-12-30)
+  const d=new Date(ms);
+  return isNaN(d)?'':d.toISOString().slice(0,10);
+}
+function isDeleted(v){
+  const s=String(v==null?'':v).trim().toLowerCase();
+  return s==='si'||s==='sí'||s==='true'||s==='1'||s==='yes';
+}
+function normalize(raw){
+  if(!Array.isArray(raw)) return [];
+  return raw
+    .filter(r=>r && r.title && !isDeleted(r.deleted))
+    .map(r=>({
+      id:      r.id||uid(),
+      title:   String(r.title),
+      desc:    r.desc||'',
+      resp:    r.resp||'',
+      due:     serialToISO(r.due),
+      prio:    ['alta','media','baja'].includes(String(r.prio||'').toLowerCase())?String(r.prio).toLowerCase():'media',
+      meet:    r.meet||'',
+      meetdate:serialToISO(r.meetdate),
+      status:  ['pendiente','proceso','completada'].includes(String(r.status||'').toLowerCase())?String(r.status).toLowerCase():'pendiente'
+    }));
+}
+
+/* ---- Lectura del JSON desde GitHub ---------------------------------------- */
+async function fetchFromGitHub(){
+  const url=DATA_URL+(DATA_URL.includes('?')?'&':'?')+'_t='+Date.now();
+  const res=await fetch(url,{cache:'no-store'});
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  return normalize(await res.json());
+}
+// Carga inicial: usa la copia local si existe; si no, trae el JSON de GitHub.
+async function boot(){
+  const local=(()=>{try{const r=localStorage.getItem(KEY);return r?JSON.parse(r):null;}catch(e){return null;}})();
+  if(local && Array.isArray(local) && local.length){
+    tasks=local; render();
+    setSync('ok','Tablero local (guardado en este navegador)');
+    return;
+  }
+  setSync('loading','Cargando desde GitHub…');
+  try{
+    tasks=await fetchFromGitHub();
+    save(); render();
+    setSync('ok','Cargado desde GitHub '+nowTime());
+  }catch(e){
+    console.error('[Seguimiento] No se pudo leer el JSON:',e);
+    tasks=[]; render();
+    setSync('err','No se pudo leer el JSON — puedes empezar con "＋ Nueva tarea"');
+  }
+}
+// Recarga manual: reemplaza el tablero con lo último del JSON.
+async function reloadFromGitHub(){
+  if(tasks.length && !confirm('Esto reemplazará el tablero actual con los datos más recientes de GitHub.\n¿Continuar?')) return;
+  setSync('loading','Recargando desde GitHub…');
+  try{
+    tasks=await fetchFromGitHub();
+    save(); render();
+    setSync('ok','Recargado desde GitHub '+nowTime());
+  }catch(e){
+    console.error('[Seguimiento] No se pudo recargar el JSON:',e);
+    setSync('err','No se pudo recargar — revisa la URL o la conexión');
+  }
+}
+function setSync(state,text){
+  const led=$('#sync-led'); led.className='led'+(state==='loading'?' loading':state==='err'?' err':'');
+  $('#sync-text').textContent=text;
+}
+function nowTime(){
+  const d=new Date();
+  return d.toLocaleTimeString('es-CR',{hour:'2-digit',minute:'2-digit'});
+}
+
+function uid(){return 't'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-3);}
+function todayStr(){return new Date().toISOString().slice(0,10);}
+
+const $=s=>document.querySelector(s);
+const board=$('#board');
+const search=$('#search'),fResp=$('#filter-resp'),fPrio=$('#filter-prio');
+
+function render(){
+  const q=search.value.trim().toLowerCase();
+  const rf=fResp.value, pf=fPrio.value;
+  document.querySelectorAll('.col-body').forEach(b=>b.innerHTML='');
+  const counts={pendiente:0,proceso:0,completada:0};
+  let total=0,late=0;
+
+  tasks.forEach(t=>{
+    total++;
+    if(isLate(t)) late++;
+  });
+
+  const visible=tasks.filter(t=>{
+    if(rf && t.resp!==rf) return false;
+    if(pf && t.prio!==pf) return false;
+    if(q){
+      const hay=(t.title+' '+(t.desc||'')+' '+(t.resp||'')+' '+(t.meet||'')).toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  ['pendiente','proceso','completada'].forEach(col=>{
+    const body=document.querySelector('.col-body[data-col="'+col+'"]');
+    const items=visible.filter(t=>t.status===col);
+    counts[col]=tasks.filter(t=>t.status===col).length;
+    if(items.length===0){
+      body.innerHTML='<div class="col-empty">Sin tareas aquí.<br>Arrastra o crea una nueva.</div>';
+    }else{
+      items.forEach(t=>body.appendChild(card(t)));
+    }
+    $('#c-'+col).textContent=items.length;
+  });
+
+  $('#s-total').textContent=total;
+  $('#s-pend').textContent=counts.pendiente;
+  $('#s-proc').textContent=counts.proceso;
+  $('#s-done').textContent=counts.completada;
+  $('#s-late').textContent=late;
+
+  refreshFilters();
+}
+
+function isLate(t){
+  return t.status!=='completada' && t.due && t.due<todayStr();
+}
+function dueInfo(t){
+  if(!t.due) return null;
+  const today=todayStr();
+  const diff=Math.round((new Date(t.due)-new Date(today))/86400000);
+  let cls='',label=fmtDate(t.due);
+  if(t.status==='completada'){cls='';}
+  else if(diff<0){cls='late';label='Vencida · '+fmtDate(t.due);}
+  else if(diff===0){cls='soon';label='Hoy';}
+  else if(diff<=2){cls='soon';label=fmtDate(t.due);}
+  return {cls,label};
+}
+function fmtDate(d){
+  const [y,m,dd]=d.split('-');
+  const meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return dd+' '+meses[+m-1];
+}
+function initials(n){if(!n)return '?';return n.trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();}
+
+function card(t){
+  const el=document.createElement('div');
+  el.className='card prio-'+t.prio;
+  el.draggable=true;
+  el.dataset.id=t.id;
+  const di=dueInfo(t);
+  const prioLabel={alta:'Alta',media:'Media',baja:'Baja'}[t.prio];
+  let meta='';
+  if(t.resp) meta+='<span class="chip"><span class="av">'+initials(t.resp)+'</span>'+esc(t.resp)+'</span>';
+  meta+='<span class="chip prio '+t.prio+'">'+prioLabel+'</span>';
+  if(di) meta+='<span class="chip date '+di.cls+'">📅 '+di.label+'</span>';
+  if(t.meet) meta+='<span class="chip">🗓 '+esc(t.meet)+'</span>';
+
+  el.innerHTML=
+    '<div class="actions">'+
+      '<button class="icon-btn edit" title="Editar"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>'+
+      '<button class="icon-btn del" title="Eliminar"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>'+
+    '</div>'+
+    '<div class="title">'+esc(t.title)+'</div>'+
+    (t.desc?'<div class="desc">'+esc(t.desc)+'</div>':'')+
+    '<div class="meta">'+meta+'</div>';
+
+  el.querySelector('.edit').addEventListener('click',e=>{e.stopPropagation();openModal(t);});
+  el.querySelector('.del').addEventListener('click',e=>{e.stopPropagation();delTask(t.id);});
+  el.addEventListener('click',()=>openModal(t));
+  el.addEventListener('dragstart',e=>{el.classList.add('dragging');e.dataTransfer.setData('text/plain',t.id);});
+  el.addEventListener('dragend',()=>el.classList.remove('dragging'));
+  return el;
+}
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+// Drag & drop
+document.querySelectorAll('.col-body').forEach(body=>{
+  body.addEventListener('dragover',e=>{e.preventDefault();body.classList.add('drag-over');});
+  body.addEventListener('dragleave',()=>body.classList.remove('drag-over'));
+  body.addEventListener('drop',e=>{
+    e.preventDefault();body.classList.remove('drag-over');
+    const id=e.dataTransfer.getData('text/plain');
+    const t=tasks.find(x=>x.id===id);
+    if(t && t.status!==body.dataset.col){t.status=body.dataset.col;save();render();}
+  });
+});
+
+function refreshFilters(){
+  const resps=[...new Set(tasks.map(t=>t.resp).filter(Boolean))].sort();
+  const cur=fResp.value;
+  fResp.innerHTML='<option value="">Todos los responsables</option>'+resps.map(r=>'<option>'+esc(r)+'</option>').join('');
+  fResp.value=cur;
+  $('#resp-list').innerHTML=resps.map(r=>'<option value="'+esc(r)+'">').join('');
+  const meets=[...new Set(tasks.map(t=>t.meet).filter(Boolean))].sort();
+  $('#meet-list').innerHTML=meets.map(m=>'<option value="'+esc(m)+'">').join('');
+}
+
+// Modal
+function openModal(t){
+  editingId = t?t.id:null;
+  $('#modal-title').textContent = t?'Editar tarea':'Nueva tarea';
+  $('#f-title').value=t?t.title:'';
+  $('#f-desc').value=t?(t.desc||''):'';
+  $('#f-resp').value=t?(t.resp||''):'';
+  $('#f-due').value=t?(t.due||''):'';
+  $('#f-meet').value=t?(t.meet||''):'';
+  $('#f-meetdate').value=t?(t.meetdate||''):'';
+  $('#f-status').value=t?t.status:'pendiente';
+  document.querySelectorAll('input[name="prio"]').forEach(r=>r.checked=(r.value===(t?t.prio:'media')));
+  $('#btn-delete').classList.toggle('hidden',!t);
+  $('#overlay').classList.add('open');
+  setTimeout(()=>$('#f-title').focus(),50);
+}
+function closeModal(){$('#overlay').classList.remove('open');editingId=null;}
+
+function saveTask(){
+  const title=$('#f-title').value.trim();
+  if(!title){$('#f-title').focus();$('#f-title').style.borderColor='var(--danger)';return;}
+  const data={
+    title,
+    desc:$('#f-desc').value.trim(),
+    resp:$('#f-resp').value.trim(),
+    due:$('#f-due').value,
+    prio:document.querySelector('input[name="prio"]:checked').value,
+    meet:$('#f-meet').value.trim(),
+    meetdate:$('#f-meetdate').value,
+    status:$('#f-status').value,
+  };
+  if(editingId){
+    const t=tasks.find(x=>x.id===editingId);Object.assign(t,data);
+  }else{
+    tasks.unshift({id:uid(),...data});
+  }
+  save();render();closeModal();
+}
+function delTask(id){
+  const t=tasks.find(x=>x.id===id);
+  if(!confirm('¿Eliminar la tarea "'+(t?t.title:'')+'"?')) return;
+  tasks=tasks.filter(x=>x.id!==id);save();render();closeModal();
+}
+
+// Export / import
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(tasks,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='tareas-reuniones-'+todayStr()+'.json';
+  a.click();URL.revokeObjectURL(a.href);
+}
+function importJSON(file){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const data=JSON.parse(reader.result);
+      if(!Array.isArray(data)) throw 0;
+      const clean=data.filter(t=>t&&t.title).map(t=>({
+        id:t.id||uid(),title:String(t.title),desc:t.desc||'',resp:t.resp||'',
+        due:t.due||'',prio:['alta','media','baja'].includes(t.prio)?t.prio:'media',
+        meet:t.meet||'',meetdate:t.meetdate||'',
+        status:['pendiente','proceso','completada'].includes(t.status)?t.status:'pendiente'
+      }));
+      if(confirm('¿Reemplazar el tablero actual con '+clean.length+' tareas del archivo?\n(Cancela para combinar en su lugar)')){
+        tasks=clean;
+      }else{
+        const ids=new Set(tasks.map(t=>t.id));
+        clean.forEach(t=>{if(ids.has(t.id))t.id=uid();tasks.push(t);});
+      }
+      save();render();
+    }catch(e){alert('El archivo no es un respaldo válido.');}
+  };
+  reader.readAsText(file);
+}
+
+// Events
+$('#btn-new').addEventListener('click',()=>openModal(null));
+$('#btn-close').addEventListener('click',closeModal);
+$('#btn-cancel').addEventListener('click',closeModal);
+$('#btn-save').addEventListener('click',saveTask);
+$('#btn-delete').addEventListener('click',()=>delTask(editingId));
+$('#btn-reload').addEventListener('click',reloadFromGitHub);
+$('#overlay').addEventListener('click',e=>{if(e.target===$('#overlay'))closeModal();});
+$('#f-title').addEventListener('input',e=>e.target.style.borderColor='');
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')closeModal();
+  if((e.metaKey||e.ctrlKey)&&e.key==='Enter'&&$('#overlay').classList.contains('open'))saveTask();
+});
+search.addEventListener('input',render);
+fResp.addEventListener('change',render);
+fPrio.addEventListener('change',render);
+$('#btn-export').addEventListener('click',exportJSON);
+$('#foot-export').addEventListener('click',exportJSON);
+$('#btn-import').addEventListener('click',()=>$('#file-import').click());
+$('#file-import').addEventListener('change',e=>{if(e.target.files[0]){importJSON(e.target.files[0]);e.target.value='';}});
+
+boot();
+</script>
+</body>
+</html>
