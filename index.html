@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Tablero Kanban (solo lectura) para dar seguimiento a las tareas operativas de las reuniones de equipo — Electroplast.">
+<meta name="theme-color" content="#0f1729">
+<title>Seguimiento de Tareas · Reuniones de Equipo</title>
+<style>
+  :root{
+    --bg:#0f1729;
+    --bg-soft:#16213e;
+    --panel:#1b2745;
+    --panel-2:#213154;
+    --line:#2c3d63;
+    --txt:#e8edf7;
+    --txt-dim:#9fb0d0;
+    --txt-faint:#6b7ba0;
+    --accent:#5b8def;
+    --accent-soft:#2a3f6b;
+    --pend:#f2b34b;
+    --proc:#5b8def;
+    --done:#3ecf8e;
+    --alta:#ff6b6b;
+    --media:#f2b34b;
+    --baja:#7aa2f7;
+    --danger:#ff6b6b;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+    --radius:14px;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 600px at 20% -10%,#1c2a4d 0%,transparent 60%),
+               radial-gradient(1000px 500px at 100% 0%,#20213e 0%,transparent 55%),
+               var(--bg);
+    color:var(--txt);
+    min-height:100vh;
+    padding:26px 22px 60px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1280px;margin:0 auto}
+
+  /* Header */
+  header.top{
+    display:flex;align-items:flex-start;justify-content:space-between;
+    gap:20px;flex-wrap:wrap;margin-bottom:22px;
+  }
+  .brand h1{font-size:1.6rem;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+  .brand .dot{width:12px;height:12px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#8b5bef);box-shadow:0 0 14px var(--accent)}
+  .brand p{color:var(--txt-dim);font-size:.9rem;margin-top:6px;max-width:520px}
+
+  .stats{display:flex;gap:12px;flex-wrap:wrap}
+  .stat{
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:10px 16px;min-width:96px;text-align:center;
+  }
+  .stat .num{font-size:1.5rem;font-weight:700;line-height:1}
+  .stat .lbl{font-size:.68rem;color:var(--txt-faint);text-transform:uppercase;letter-spacing:.08em;margin-top:5px}
+  .stat.total .num{color:var(--txt)}
+  .stat.p .num{color:var(--pend)}
+  .stat.i .num{color:var(--proc)}
+  .stat.d .num{color:var(--done)}
+  .stat.late .num{color:var(--danger)}
+
+  /* Toolbar */
+  .toolbar{
+    display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:12px;margin-bottom:20px;
+  }
+  .toolbar .search{position:relative;flex:1;min-width:200px}
+  .toolbar .search input{
+    width:100%;background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;
+    color:var(--txt);padding:10px 12px 10px 36px;font-size:.9rem;
+  }
+  .toolbar .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:.5}
+  select,.btn{
+    background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;
+    color:var(--txt);padding:10px 12px;font-size:.88rem;cursor:pointer;transition:.15s;
+  }
+  select:hover,.btn:hover{border-color:var(--accent)}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),#6a5bef);border:none;font-weight:600;padding:10px 18px}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .btn.ghost{background:transparent}
+  .btn[disabled]{opacity:.5;cursor:default}
+  .spacer{flex:1}
+
+  /* Indicador de sincronización (solo lectura) */
+  .syncbar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    margin-bottom:16px;font-size:.8rem;color:var(--txt-dim);
+  }
+  .syncbar .pill{
+    display:inline-flex;align-items:center;gap:7px;background:var(--panel);
+    border:1px solid var(--line);border-radius:20px;padding:6px 12px;
+  }
+  .syncbar .led{width:8px;height:8px;border-radius:50%;background:var(--done);box-shadow:0 0 8px var(--done)}
+  .syncbar .led.loading{background:var(--pend);box-shadow:0 0 8px var(--pend);animation:pulse 1s infinite}
+  .syncbar .led.err{background:var(--danger);box-shadow:0 0 8px var(--danger)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .badge-ro{
+    display:inline-flex;align-items:center;gap:6px;background:rgba(91,141,239,.14);
+    border:1px solid var(--accent-soft);color:#a5c0fb;border-radius:20px;padding:4px 11px;
+    font-size:.72rem;font-weight:600;letter-spacing:.02em;
+  }
+
+  /* Board */
+  .board{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:900px){.board{grid-template-columns:1fr}}
+  .col{
+    background:linear-gradient(180deg,var(--bg-soft),rgba(22,33,62,.4));
+    border:1px solid var(--line);border-radius:var(--radius);
+    display:flex;flex-direction:column;min-height:220px;
+  }
+  .col-head{
+    display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:1px solid var(--line);
+    position:sticky;top:0;
+  }
+  .col-head .tag{width:10px;height:10px;border-radius:50%}
+  .col-head h2{font-size:.95rem;font-weight:600;letter-spacing:.01em}
+  .col-head .count{margin-left:auto;background:var(--panel-2);color:var(--txt-dim);
+    font-size:.75rem;font-weight:600;padding:2px 9px;border-radius:20px;min-width:26px;text-align:center}
+  .col[data-col="pendiente"] .tag{background:var(--pend)}
+  .col[data-col="proceso"] .tag{background:var(--proc)}
+  .col[data-col="completada"] .tag{background:var(--done)}
+  .col-body{padding:12px;display:flex;flex-direction:column;gap:11px;flex:1;overflow:visible}
+  .col-empty{color:var(--txt-faint);font-size:.82rem;text-align:center;padding:26px 10px;border:1.5px dashed var(--line);border-radius:10px}
+
+  /* Card (solo lectura) */
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line);
+    border-radius:11px;padding:12px 13px;transition:.15s;position:relative;
+  }
+  .card:hover{border-color:var(--accent-soft);transform:translateY(-1px);box-shadow:var(--shadow)}
+  .card.prio-alta{border-left-color:var(--alta)}
+  .card.prio-media{border-left-color:var(--media)}
+  .card.prio-baja{border-left-color:var(--baja)}
+  .card .title{font-size:.94rem;font-weight:600;line-height:1.35;word-break:break-word}
+  .card .desc{font-size:.8rem;color:var(--txt-dim);margin-top:5px;line-height:1.4;word-break:break-word}
+  .card .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+  .chip{
+    display:inline-flex;align-items:center;gap:5px;font-size:.72rem;
+    background:var(--bg-soft);border:1px solid var(--line);border-radius:20px;padding:3px 9px;color:var(--txt-dim);
+  }
+  .chip.prio{font-weight:600}
+  .chip.prio.alta{background:rgba(255,107,107,.14);border-color:rgba(255,107,107,.4);color:#ff9a9a}
+  .chip.prio.media{background:rgba(242,179,75,.14);border-color:rgba(242,179,75,.4);color:#f7c877}
+  .chip.prio.baja{background:rgba(122,162,247,.14);border-color:rgba(122,162,247,.4);color:#a5c0fb}
+  .chip.date.late{background:rgba(255,107,107,.16);border-color:rgba(255,107,107,.45);color:#ff9a9a;font-weight:600}
+  .chip.date.soon{background:rgba(242,179,75,.14);border-color:rgba(242,179,75,.4);color:#f7c877}
+  .chip .av{width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#8b5bef);
+    color:#fff;font-size:.6rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+
+  footer.foot{margin-top:30px;text-align:center;color:var(--txt-faint);font-size:.78rem;line-height:1.7}
+  footer.foot a{color:var(--accent);cursor:pointer;text-decoration:none}
+  footer.foot code{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:.72rem;color:var(--txt-dim)}
+  .hidden{display:none!important}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <h1><span class="dot"></span> Seguimiento de Tareas</h1>
+      <p>Vista de solo lectura de los pendientes operativos de las reuniones de equipo. Los datos se leen desde GitHub y se actualizan automáticamente.</p>
+    </div>
+    <div class="stats">
+      <div class="stat total"><div class="num" id="s-total">0</div><div class="lbl">Total</div></div>
+      <div class="stat p"><div class="num" id="s-pend">0</div><div class="lbl">Pendientes</div></div>
+      <div class="stat i"><div class="num" id="s-proc">0</div><div class="lbl">En proceso</div></div>
+      <div class="stat d"><div class="num" id="s-done">0</div><div class="lbl">Completadas</div></div>
+      <div class="stat late"><div class="num" id="s-late">0</div><div class="lbl">Vencidas</div></div>
+    </div>
+  </header>
+
+  <div class="syncbar">
+    <span class="pill"><span class="led" id="sync-led"></span><span id="sync-text">Cargando datos…</span></span>
+    <span class="badge-ro">🔒 Solo lectura</span>
+    <span class="spacer"></span>
+    <button class="btn ghost" id="btn-refresh" title="Actualizar ahora">↻ Actualizar</button>
+    <button class="btn ghost" id="btn-export" title="Descargar copia de lo que ves">Exportar</button>
+  </div>
+
+  <div class="toolbar">
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="search" type="text" placeholder="Buscar tarea, responsable o reunión…">
+    </div>
+    <select id="filter-resp"><option value="">Todos los responsables</option></select>
+    <select id="filter-prio">
+      <option value="">Toda prioridad</option>
+      <option value="alta">Alta</option>
+      <option value="media">Media</option>
+      <option value="baja">Baja</option>
+    </select>
+  </div>
+
+  <div class="board" id="board">
+    <div class="col" data-col="pendiente">
+      <div class="col-head"><span class="tag"></span><h2>Pendiente</h2><span class="count" id="c-pendiente">0</span></div>
+      <div class="col-body" data-col="pendiente"></div>
+    </div>
+    <div class="col" data-col="proceso">
+      <div class="col-head"><span class="tag"></span><h2>En proceso</h2><span class="count" id="c-proceso">0</span></div>
+      <div class="col-body" data-col="proceso"></div>
+    </div>
+    <div class="col" data-col="completada">
+      <div class="col-head"><span class="tag"></span><h2>Completada</h2><span class="count" id="c-completada">0</span></div>
+      <div class="col-body" data-col="completada"></div>
+    </div>
+  </div>
+
+  <footer class="foot">
+    Vista de solo lectura. Los datos provienen del archivo <code>kambam.json</code> en GitHub y se refrescan cada 5 minutos.<br>
+    Para modificar tareas, edita el Excel en SharePoint; los cambios llegan aquí por medio de Power Automate.<br>
+    Hecho para reuniones de equipo — Electroplast.
+  </footer>
+</div>
+
+<script>
+/* ===========================================================================
+   ORIGEN DE DATOS (SOLO LECTURA)
+   El tablero LEE las tareas desde un archivo JSON publicado en GitHub, que es
+   alimentado por Excel (SharePoint) a través de Power Automate. No se guarda ni
+   se edita nada desde aquí: es un visor.
+
+   - DATA_URL debe ser la URL "raw" del archivo (no la de vista "blob").
+     Vista:  https://github.com/electroplast-sa/Segumiento_Tareas/blob/main/kambam.json
+     Raw:    https://raw.githubusercontent.com/electroplast-sa/Segumiento_Tareas/main/kambam.json
+   - REFRESH_MS: cada cuánto se vuelve a leer el JSON (5 minutos).
+   =========================================================================== */
+const DATA_URL='https://raw.githubusercontent.com/electroplast-sa/Segumiento_Tareas/main/kambam.json';
+const REFRESH_MS=5*60*1000;
+
+let tasks=[];
+
+/* ---- Normalización de los datos que exporta Excel / Power Automate ---------
+   - Fechas: Excel las manda como número de serie ("46221"). Se convierten a
+     AAAA-MM-DD. Si ya viene como fecha, se respeta.
+   - Se ignoran campos técnicos de OData (@odata.etag, ItemInternalId).
+   - Se ocultan los registros marcados como eliminados (deleted = "si").
+   --------------------------------------------------------------------------- */
+function serialToISO(v){
+  if(v===null||v===undefined||v==='') return '';
+  const s=String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);   // ya es fecha
+  const n=Number(s);
+  if(!isFinite(n)) return '';
+  const ms=Math.round((n-25569)*86400000);                // serie Excel (base 1899-12-30)
+  const d=new Date(ms);
+  return isNaN(d)?'':d.toISOString().slice(0,10);
+}
+function isDeleted(v){
+  const s=String(v==null?'':v).trim().toLowerCase();
+  return s==='si'||s==='sí'||s==='true'||s==='1'||s==='yes';
+}
+function normalize(raw){
+  if(!Array.isArray(raw)) return [];
+  return raw
+    .filter(r=>r && r.title && !isDeleted(r.deleted))
+    .map(r=>({
+      id:      r.id||('t'+Math.random().toString(36).slice(2,9)),
+      title:   String(r.title),
+      desc:    r.desc||'',
+      resp:    r.resp||'',
+      due:     serialToISO(r.due),
+      prio:    ['alta','media','baja'].includes(String(r.prio||'').toLowerCase())?String(r.prio).toLowerCase():'media',
+      meet:    r.meet||'',
+      meetdate:serialToISO(r.meetdate),
+      status:  ['pendiente','proceso','completada'].includes(String(r.status||'').toLowerCase())?String(r.status).toLowerCase():'pendiente'
+    }));
+}
+
+/* ---- Lectura del JSON desde GitHub ---------------------------------------- */
+async function fetchData(manual){
+  setSync('loading','Actualizando…');
+  try{
+    // El parámetro evita que el navegador/CDN sirva una copia vieja en caché.
+    const url=DATA_URL+(DATA_URL.includes('?')?'&':'?')+'_t='+Date.now();
+    const res=await fetch(url,{cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    tasks=normalize(data);
+    render();
+    setSync('ok','Actualizado '+nowTime());
+  }catch(e){
+    console.error('[Seguimiento] Error al leer el JSON:',e);
+    setSync('err','No se pudo leer el JSON'+(manual?' — revisa la URL o la conexión':''));
+    if(!tasks.length){
+      document.querySelectorAll('.col-body').forEach(b=>b.innerHTML='');
+      document.querySelector('.col-body[data-col="pendiente"]').innerHTML=
+        '<div class="col-empty">No se pudo cargar la información.<br>Verifica que el archivo exista y sea público en GitHub.</div>';
+    }
+  }
+}
+function setSync(state,text){
+  const led=$('#sync-led'); led.className='led'+(state==='loading'?' loading':state==='err'?' err':'');
+  $('#sync-text').textContent=text;
+}
+function nowTime(){
+  const d=new Date();
+  return d.toLocaleTimeString('es-CR',{hour:'2-digit',minute:'2-digit'});
+}
+
+/* ---- Utilidades y render (visualización) ---------------------------------- */
+const $=s=>document.querySelector(s);
+const search=$('#search'),fResp=$('#filter-resp'),fPrio=$('#filter-prio');
+
+function render(){
+  const q=search.value.trim().toLowerCase();
+  const rf=fResp.value, pf=fPrio.value;
+  document.querySelectorAll('.col-body').forEach(b=>b.innerHTML='');
+  const counts={pendiente:0,proceso:0,completada:0};
+  let total=0,late=0;
+
+  tasks.forEach(t=>{ total++; if(isLate(t)) late++; });
+
+  const visible=tasks.filter(t=>{
+    if(rf && t.resp!==rf) return false;
+    if(pf && t.prio!==pf) return false;
+    if(q){
+      const hay=(t.title+' '+(t.desc||'')+' '+(t.resp||'')+' '+(t.meet||'')).toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  ['pendiente','proceso','completada'].forEach(col=>{
+    const body=document.querySelector('.col-body[data-col="'+col+'"]');
+    const items=visible.filter(t=>t.status===col);
+    if(items.length===0){
+      body.innerHTML='<div class="col-empty">Sin tareas aquí.</div>';
+    }else{
+      items.forEach(t=>body.appendChild(card(t)));
+    }
+    $('#c-'+col).textContent=items.length;
+  });
+
+  $('#s-total').textContent=total;
+  $('#s-pend').textContent=tasks.filter(t=>t.status==='pendiente').length;
+  $('#s-proc').textContent=tasks.filter(t=>t.status==='proceso').length;
+  $('#s-done').textContent=tasks.filter(t=>t.status==='completada').length;
+  $('#s-late').textContent=late;
+
+  refreshFilters();
+}
+
+function isLate(t){ return t.status!=='completada' && t.due && t.due<todayStr(); }
+function todayStr(){return new Date().toISOString().slice(0,10);}
+function dueInfo(t){
+  if(!t.due) return null;
+  const today=todayStr();
+  const diff=Math.round((new Date(t.due)-new Date(today))/86400000);
+  let cls='',label=fmtDate(t.due);
+  if(t.status==='completada'){cls='';}
+  else if(diff<0){cls='late';label='Vencida · '+fmtDate(t.due);}
+  else if(diff===0){cls='soon';label='Hoy';}
+  else if(diff<=2){cls='soon';label=fmtDate(t.due);}
+  return {cls,label};
+}
+function fmtDate(d){
+  const [y,m,dd]=d.split('-');
+  const meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return dd+' '+meses[+m-1];
+}
+function initials(n){if(!n)return '?';return n.trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();}
+
+function card(t){
+  const el=document.createElement('div');
+  el.className='card prio-'+t.prio;
+  el.dataset.id=t.id;
+  const di=dueInfo(t);
+  const prioLabel={alta:'Alta',media:'Media',baja:'Baja'}[t.prio];
+  let meta='';
+  if(t.resp) meta+='<span class="chip"><span class="av">'+initials(t.resp)+'</span>'+esc(t.resp)+'</span>';
+  meta+='<span class="chip prio '+t.prio+'">'+prioLabel+'</span>';
+  if(di) meta+='<span class="chip date '+di.cls+'">📅 '+di.label+'</span>';
+  if(t.meet) meta+='<span class="chip">🗓 '+esc(t.meet)+'</span>';
+
+  el.innerHTML=
+    '<div class="title">'+esc(t.title)+'</div>'+
+    (t.desc?'<div class="desc">'+esc(t.desc)+'</div>':'')+
+    '<div class="meta">'+meta+'</div>';
+  return el;
+}
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function refreshFilters(){
+  const resps=[...new Set(tasks.map(t=>t.resp).filter(Boolean))].sort();
+  const cur=fResp.value;
+  fResp.innerHTML='<option value="">Todos los responsables</option>'+resps.map(r=>'<option>'+esc(r)+'</option>').join('');
+  fResp.value=cur;
+}
+
+/* ---- Exportar una copia de lo que se está viendo -------------------------- */
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(tasks,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='tareas-reuniones-'+todayStr()+'.json';
+  a.click();URL.revokeObjectURL(a.href);
+}
+
+/* ---- Eventos -------------------------------------------------------------- */
+search.addEventListener('input',render);
+fResp.addEventListener('change',render);
+fPrio.addEventListener('change',render);
+$('#btn-refresh').addEventListener('click',()=>fetchData(true));
+$('#btn-export').addEventListener('click',exportJSON);
+
+/* ---- Arranque + auto-refresco cada 5 minutos ----------------------------- */
+fetchData();
+setInterval(fetchData,REFRESH_MS);
+// Al volver a la pestaña, refresca de inmediato.
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) fetchData(); });
+</script>
+</body>
+</html>
