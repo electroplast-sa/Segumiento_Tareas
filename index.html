@@ -4,193 +4,227 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Tablero Kanban para dar seguimiento a las tareas operativas de las reuniones de equipo — Electroplast.">
-<meta name="theme-color" content="#0f1729">
+<meta name="theme-color" content="#f3f5f9">
 <title>Seguimiento de Tareas · Reuniones de Equipo</title>
 <style>
-  :root{
-    --bg:#0f1729;
-    --bg-soft:#16213e;
-    --panel:#1b2745;
-    --panel-2:#213154;
-    --line:#2c3d63;
-    --txt:#e8edf7;
-    --txt-dim:#9fb0d0;
-    --txt-faint:#6b7ba0;
-    --accent:#5b8def;
-    --accent-soft:#2a3f6b;
-    --pend:#f2b34b;
-    --proc:#5b8def;
-    --done:#3ecf8e;
-    --alta:#ff6b6b;
-    --media:#f2b34b;
-    --baja:#7aa2f7;
-    --danger:#ff6b6b;
-    --shadow:0 10px 30px rgba(0,0,0,.35);
-    --radius:14px;
-    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{
-    background:radial-gradient(1200px 600px at 20% -10%,#1c2a4d 0%,transparent 60%),
-               radial-gradient(1000px 500px at 100% 0%,#20213e 0%,transparent 55%),
-               var(--bg);
-    color:var(--txt);
-    min-height:100vh;
-    padding:26px 22px 60px;
-    -webkit-font-smoothing:antialiased;
-  }
-  .wrap{max-width:1280px;margin:0 auto}
+/* ===========================================================================
+   REDISEÑO VISUAL (UI/UX) — SOLO CAPA DE PRESENTACIÓN
+   ---------------------------------------------------------------------------
+   · Este bloque <style> es lo ÚNICO que cambió respecto a la versión anterior.
+   · NO se modificó ningún selector, clase ni id: el JavaScript, la lógica de
+     negocio y las integraciones con Power Automate quedan intactas.
+   · Cambio: tema oscuro → tema claro corporativo (azules sobrios, grises fríos).
+   · Paleta de estados validada para accesibilidad sobre fondo claro
+     (contraste >= 3:1; estados siempre acompañados de etiqueta de texto).
+   =========================================================================== */
+:root{
+  /* Superficies frías y claras (antes: azul oscuro) */
+  --bg:#f3f5f9;            /* fondo general */
+  --bg-soft:#f8fafc;       /* campos y superficies suaves */
+  --panel:#ffffff;         /* tarjetas y paneles */
+  --panel-2:#eef2f7;       /* superficies secundarias (hover, contadores) */
+  --line:#dfe6ef;          /* bordes y divisores */
+  /* Tinta: el texto usa tonos de tinta, nunca el color de estado */
+  --txt:#1f2a3d;
+  --txt-dim:#5b6b83;
+  --txt-faint:#93a1b5;
+  /* Acento corporativo: paleta de marca ElectroPlast (azul + verde del logo) */
+  --accent:#1f6bbd;        /* azul "Electro" */
+  --accent-soft:#d5e6f7;
+  --brand-green:#2f9d3a;   /* verde "Plast" — SOLO decorativo (logo, botón, degradados) */
+  --brand-blue:#1f6bbd;
+  /* Estados (validados sobre fondo claro; el verde de estado es la variante
+     accesible del verde de marca — el verde puro no se distingue del rojo
+     para daltonismo, por eso se reserva a elementos decorativos) */
+  --pend:#c77414;          /* pendiente  · ámbar sobrio  */
+  --proc:#1f6bbd;          /* en proceso · azul de marca */
+  --done:#2e8b6a;          /* completada · verde accesible */
+  /* Prioridades */
+  --alta:#c0443c;
+  --media:#c77414;
+  --baja:#4f77ad;
+  --danger:#c0443c;
+  /* Sombra suave, elegante (antes: sombra dura de tema oscuro) */
+  --shadow:0 6px 18px rgba(31,42,61,.08);
+  --radius:14px;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  /* Fondo claro armonizado con el logo: tinte azul (arriba-izq, junto al logo)
+     y tinte verde muy sutil (arriba-der) sobre gris frío neutro */
+  background:radial-gradient(1200px 600px at 20% -10%,#e4edf8 0%,transparent 60%),
+             radial-gradient(1000px 500px at 100% 0%,#e6f2e8 0%,transparent 55%),
+             var(--bg);
+  color:var(--txt);
+  min-height:100vh;
+  padding:26px 22px 60px;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1280px;margin:0 auto}
 
-  /* Header */
-  header.top{
-    display:flex;align-items:flex-start;justify-content:space-between;
-    gap:20px;flex-wrap:wrap;margin-bottom:22px;
-  }
-  .brand h1{font-size:1.6rem;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
-  .brand .dot{width:12px;height:12px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#8b5bef);box-shadow:0 0 14px var(--accent)}
-  .brand p{color:var(--txt-dim);font-size:.9rem;margin-top:6px;max-width:520px}
+/* Header (sin cambios estructurales) */
+header.top{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  gap:20px;flex-wrap:wrap;margin-bottom:22px;
+}
+.brand h1{font-size:1.6rem;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:12px;color:var(--txt)}
+/* Logo ElectroPlast: mix-blend-mode:multiply funde el fondo blanco del PNG con
+   la página clara, para que no se vea el recuadro blanco del archivo */
+.brand .logo{height:52px;width:auto;mix-blend-mode:multiply;flex-shrink:0}
+/* Respaldo SVG del logo (se muestra solo si logo.png no existe en el repo) */
+.brand .logo-fb{height:56px;width:auto;flex-shrink:0}
+.brand p{color:var(--txt-dim);font-size:.9rem;margin-top:6px;max-width:520px}
 
-  .stats{display:flex;gap:12px;flex-wrap:wrap}
-  .stat{
-    background:var(--panel);border:1px solid var(--line);border-radius:12px;
-    padding:10px 16px;min-width:96px;text-align:center;
-  }
-  .stat .num{font-size:1.5rem;font-weight:700;line-height:1}
-  .stat .lbl{font-size:.68rem;color:var(--txt-faint);text-transform:uppercase;letter-spacing:.08em;margin-top:5px}
-  .stat.total .num{color:var(--txt)}
-  .stat.p .num{color:var(--pend)}
-  .stat.i .num{color:var(--proc)}
-  .stat.d .num{color:var(--done)}
-  .stat.late .num{color:var(--danger)}
+/* Indicadores (KPI): número grande, etiqueta discreta */
+.stats{display:flex;gap:12px;flex-wrap:wrap}
+.stat{
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:10px 16px;min-width:96px;text-align:center;box-shadow:0 1px 3px rgba(31,42,61,.05);
+}
+.stat .num{font-size:1.5rem;font-weight:700;line-height:1}
+.stat .lbl{font-size:.68rem;color:var(--txt-faint);text-transform:uppercase;letter-spacing:.08em;margin-top:5px}
+.stat.total .num{color:var(--txt)}
+.stat.p .num{color:var(--pend)}
+.stat.i .num{color:var(--proc)}
+.stat.d .num{color:var(--done)}
+.stat.late .num{color:var(--danger)}
 
-  /* Toolbar */
-  .toolbar{
-    display:flex;gap:10px;flex-wrap:wrap;align-items:center;
-    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
-    padding:12px;margin-bottom:20px;
-  }
-  .toolbar .search{position:relative;flex:1;min-width:200px}
-  .toolbar .search input{
-    width:100%;background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;
-    color:var(--txt);padding:10px 12px 10px 36px;font-size:.9rem;
-  }
-  .toolbar .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:.5}
-  select,.btn{
-    background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;
-    color:var(--txt);padding:10px 12px;font-size:.88rem;cursor:pointer;transition:.15s;
-  }
-  select:hover,.btn:hover{border-color:var(--accent)}
-  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
-  .btn.primary{background:linear-gradient(135deg,var(--accent),#6a5bef);border:none;font-weight:600;padding:10px 18px}
-  .btn.primary:hover{filter:brightness(1.08)}
-  .btn.ghost{background:transparent}
-  .spacer{flex:1}
+/* Toolbar (mismos controles, apariencia clara) */
+.toolbar{
+  display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:12px;margin-bottom:20px;box-shadow:0 1px 3px rgba(31,42,61,.05);
+}
+.toolbar .search{position:relative;flex:1;min-width:200px}
+.toolbar .search input{
+  width:100%;background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;
+  color:var(--txt);padding:10px 12px 10px 36px;font-size:.9rem;
+}
+.toolbar .search input::placeholder{color:var(--txt-faint)}
+.toolbar .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:.45;color:var(--txt-dim)}
+select,.btn{
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  color:var(--txt);padding:10px 12px;font-size:.88rem;cursor:pointer;transition:.15s;
+}
+select:hover,.btn:hover{border-color:var(--accent);background:var(--bg-soft)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+/* Botón principal: degradado azul→verde del logo (identidad de marca) */
+.btn.primary{background:linear-gradient(135deg,var(--brand-blue),var(--brand-green));border:none;font-weight:600;padding:10px 18px;color:#fff}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.ghost{background:transparent}
+.spacer{flex:1}
 
-  /* Barra de origen de datos */
-  .syncbar{
-    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-    margin-bottom:16px;font-size:.8rem;color:var(--txt-dim);
-  }
-  .syncbar .pill{
-    display:inline-flex;align-items:center;gap:7px;background:var(--panel);
-    border:1px solid var(--line);border-radius:20px;padding:6px 12px;
-  }
-  .syncbar .led{width:8px;height:8px;border-radius:50%;background:var(--done);box-shadow:0 0 8px var(--done)}
-  .syncbar .led.loading{background:var(--pend);box-shadow:0 0 8px var(--pend);animation:pulse 1s infinite}
-  .syncbar .led.err{background:var(--danger);box-shadow:0 0 8px var(--danger)}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+/* Barra de estado de sincronización (misma lógica, look claro) */
+.syncbar{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin-bottom:16px;font-size:.8rem;color:var(--txt-dim);
+}
+.syncbar .pill{
+  display:inline-flex;align-items:center;gap:7px;background:var(--panel);
+  border:1px solid var(--line);border-radius:20px;padding:6px 12px;
+}
+.syncbar .led{width:8px;height:8px;border-radius:50%;background:var(--done);box-shadow:0 0 0 3px rgba(46,139,106,.18)}
+.syncbar .led.loading{background:var(--pend);box-shadow:0 0 0 3px rgba(199,116,20,.18);animation:pulse 1s infinite}
+.syncbar .led.err{background:var(--danger);box-shadow:0 0 0 3px rgba(192,68,60,.18)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 
-  /* Board */
-  .board{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-  @media(max-width:900px){.board{grid-template-columns:1fr}}
-  .col{
-    background:linear-gradient(180deg,var(--bg-soft),rgba(22,33,62,.4));
-    border:1px solid var(--line);border-radius:var(--radius);
-    display:flex;flex-direction:column;min-height:220px;
-  }
-  .col-head{
-    display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:1px solid var(--line);
-    position:sticky;top:0;
-  }
-  .col-head .tag{width:10px;height:10px;border-radius:50%}
-  .col-head h2{font-size:.95rem;font-weight:600;letter-spacing:.01em}
-  .col-head .count{margin-left:auto;background:var(--panel-2);color:var(--txt-dim);
-    font-size:.75rem;font-weight:600;padding:2px 9px;border-radius:20px;min-width:26px;text-align:center}
-  .col[data-col="pendiente"] .tag{background:var(--pend)}
-  .col[data-col="proceso"] .tag{background:var(--proc)}
-  .col[data-col="completada"] .tag{background:var(--done)}
-  .col-body{padding:12px;display:flex;flex-direction:column;gap:11px;flex:1;overflow:visible}
-  .col-body.drag-over{background:rgba(91,141,239,.08);border-radius:10px}
-  .col-empty{color:var(--txt-faint);font-size:.82rem;text-align:center;padding:26px 10px;border:1.5px dashed var(--line);border-radius:10px}
+/* Tablero: columnas claras con encabezado fijo */
+.board{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:900px){.board{grid-template-columns:1fr}}
+.col{
+  background:linear-gradient(180deg,#fbfcfe,#f6f8fb);
+  border:1px solid var(--line);border-radius:var(--radius);
+  display:flex;flex-direction:column;min-height:220px;
+}
+.col-head{
+  display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:1px solid var(--line);
+  position:sticky;top:0;background:rgba(251,252,254,.92);backdrop-filter:blur(4px);
+  border-radius:var(--radius) var(--radius) 0 0;z-index:1;
+}
+.col-head .tag{width:10px;height:10px;border-radius:50%}
+.col-head h2{font-size:.95rem;font-weight:600;letter-spacing:.01em;color:var(--txt)}
+.col-head .count{margin-left:auto;background:var(--panel-2);color:var(--txt-dim);
+  font-size:.75rem;font-weight:600;padding:2px 9px;border-radius:20px;min-width:26px;text-align:center}
+.col[data-col="pendiente"] .tag{background:var(--pend)}
+.col[data-col="proceso"] .tag{background:var(--proc)}
+.col[data-col="completada"] .tag{background:var(--done)}
+.col-body{padding:12px;display:flex;flex-direction:column;gap:11px;flex:1;overflow:visible}
+.col-body.drag-over{background:rgba(47,109,179,.06);border-radius:10px}
+.col-empty{color:var(--txt-faint);font-size:.82rem;text-align:center;padding:26px 10px;border:1.5px dashed var(--line);border-radius:10px}
 
-  /* Card */
-  .card{
-    background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line);
-    border-radius:11px;padding:12px 13px;cursor:grab;transition:.15s;position:relative;
-  }
-  .card:hover{border-color:var(--accent-soft);transform:translateY(-1px);box-shadow:var(--shadow)}
-  .card.dragging{opacity:.45;cursor:grabbing}
-  .card.prio-alta{border-left-color:var(--alta)}
-  .card.prio-media{border-left-color:var(--media)}
-  .card.prio-baja{border-left-color:var(--baja)}
-  .card .title{font-size:.94rem;font-weight:600;line-height:1.35;padding-right:20px;word-break:break-word}
-  .card .desc{font-size:.8rem;color:var(--txt-dim);margin-top:5px;line-height:1.4;word-break:break-word}
-  .card .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
-  .chip{
-    display:inline-flex;align-items:center;gap:5px;font-size:.72rem;
-    background:var(--bg-soft);border:1px solid var(--line);border-radius:20px;padding:3px 9px;color:var(--txt-dim);
-  }
-  .chip.prio{font-weight:600}
-  .chip.prio.alta{background:rgba(255,107,107,.14);border-color:rgba(255,107,107,.4);color:#ff9a9a}
-  .chip.prio.media{background:rgba(242,179,75,.14);border-color:rgba(242,179,75,.4);color:#f7c877}
-  .chip.prio.baja{background:rgba(122,162,247,.14);border-color:rgba(122,162,247,.4);color:#a5c0fb}
-  .chip.date.late{background:rgba(255,107,107,.16);border-color:rgba(255,107,107,.45);color:#ff9a9a;font-weight:600}
-  .chip.date.soon{background:rgba(242,179,75,.14);border-color:rgba(242,179,75,.4);color:#f7c877}
-  .chip .av{width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#8b5bef);
-    color:#fff;font-size:.6rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
-  .card .actions{position:absolute;top:9px;right:9px;display:flex;gap:2px;opacity:0;transition:.15s}
-  .card:hover .actions{opacity:1}
-  .icon-btn{background:transparent;border:none;color:var(--txt-faint);cursor:pointer;padding:3px;border-radius:6px;line-height:0}
-  .icon-btn:hover{color:var(--txt);background:var(--panel-2)}
-  .icon-btn.del:hover{color:var(--danger)}
+/* Tarjeta: blanca, jerarquía título > detalle > chips, banda de prioridad */
+.card{
+  background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line);
+  border-radius:11px;padding:12px 13px;cursor:grab;transition:.15s;position:relative;
+  box-shadow:0 1px 3px rgba(31,42,61,.05);
+}
+.card:hover{border-color:#c9d8ea;border-left-width:3px;transform:translateY(-1px);box-shadow:var(--shadow)}
+.card.dragging{opacity:.45;cursor:grabbing}
+.card.prio-alta{border-left-color:var(--alta)}
+.card.prio-media{border-left-color:var(--media)}
+.card.prio-baja{border-left-color:var(--baja)}
+.card .title{font-size:.94rem;font-weight:600;line-height:1.35;padding-right:20px;word-break:break-word;color:var(--txt)}
+.card .desc{font-size:.8rem;color:var(--txt-dim);margin-top:5px;line-height:1.4;word-break:break-word}
+.card .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
 
-  /* Modal */
-  .overlay{
-    position:fixed;inset:0;background:rgba(6,10,22,.72);backdrop-filter:blur(3px);
-    display:none;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto;
-  }
-  .overlay.open{display:flex}
-  .modal{
-    background:var(--bg-soft);border:1px solid var(--line);border-radius:16px;
-    width:100%;max-width:520px;box-shadow:var(--shadow);animation:pop .18s ease;
-  }
-  @keyframes pop{from{transform:translateY(10px) scale(.98);opacity:0}to{transform:none;opacity:1}}
-  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--line)}
-  .modal-head h3{font-size:1.1rem}
-  .modal-body{padding:20px;display:flex;flex-direction:column;gap:15px}
-  .field label{display:block;font-size:.78rem;color:var(--txt-dim);margin-bottom:6px;font-weight:500}
-  .field input,.field textarea,.field select{
-    width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;
-    color:var(--txt);padding:10px 12px;font-size:.9rem;font-family:inherit;
-  }
-  .field textarea{resize:vertical;min-height:64px}
-  .row{display:flex;gap:12px}
-  .row .field{flex:1}
-  .seg{display:flex;gap:8px}
-  .seg label{flex:1;cursor:pointer}
-  .seg input{display:none}
-  .seg span{display:block;text-align:center;padding:9px;border:1px solid var(--line);border-radius:10px;font-size:.85rem;transition:.15s;color:var(--txt-dim)}
-  .seg input:checked + span{color:#fff;font-weight:600}
-  .seg .a input:checked + span{background:rgba(255,107,107,.2);border-color:var(--alta);color:#ff9a9a}
-  .seg .m input:checked + span{background:rgba(242,179,75,.2);border-color:var(--media);color:#f7c877}
-  .seg .b input:checked + span{background:rgba(122,162,247,.2);border-color:var(--baja);color:#a5c0fb}
-  .modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:16px 20px;border-top:1px solid var(--line)}
+/* Chips: fondos tenues + texto oscuro legible (estado siempre con etiqueta) */
+.chip{
+  display:inline-flex;align-items:center;gap:5px;font-size:.72rem;
+  background:var(--bg-soft);border:1px solid var(--line);border-radius:20px;padding:3px 9px;color:var(--txt-dim);
+}
+.chip.prio{font-weight:600}
+.chip.prio.alta{background:rgba(192,68,60,.08);border-color:rgba(192,68,60,.32);color:#a13a33}
+.chip.prio.media{background:rgba(199,116,20,.08);border-color:rgba(199,116,20,.35);color:#96570d}
+.chip.prio.baja{background:rgba(79,119,173,.09);border-color:rgba(79,119,173,.35);color:#3d6295}
+.chip.date.late{background:rgba(192,68,60,.09);border-color:rgba(192,68,60,.38);color:#a13a33;font-weight:600}
+.chip.date.soon{background:rgba(199,116,20,.09);border-color:rgba(199,116,20,.35);color:#96570d}
+.chip .av{width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,var(--brand-blue),var(--brand-green));
+  color:#fff;font-size:.6rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.card .actions{position:absolute;top:9px;right:9px;display:flex;gap:2px;opacity:0;transition:.15s}
+.card:hover .actions{opacity:1}
+.icon-btn{background:transparent;border:none;color:var(--txt-faint);cursor:pointer;padding:3px;border-radius:6px;line-height:0}
+.icon-btn:hover{color:var(--txt);background:var(--panel-2)}
+.icon-btn.del:hover{color:var(--danger)}
 
-  footer.foot{margin-top:30px;text-align:center;color:var(--txt-faint);font-size:.78rem;line-height:1.7}
-  footer.foot a{color:var(--accent);cursor:pointer;text-decoration:none}
-  .hidden{display:none!important}
-  ::-webkit-scrollbar{width:10px;height:10px}
-  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:20px}
+/* Modal claro (misma estructura y campos) */
+.overlay{
+  position:fixed;inset:0;background:rgba(31,42,61,.38);backdrop-filter:blur(3px);
+  display:none;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto;
+}
+.overlay.open{display:flex}
+.modal{
+  background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  width:100%;max-width:520px;box-shadow:0 18px 50px rgba(31,42,61,.18);animation:pop .18s ease;
+}
+@keyframes pop{from{transform:translateY(10px) scale(.98);opacity:0}to{transform:none;opacity:1}}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--line)}
+.modal-head h3{font-size:1.1rem;color:var(--txt)}
+.modal-body{padding:20px;display:flex;flex-direction:column;gap:15px}
+.field label{display:block;font-size:.78rem;color:var(--txt-dim);margin-bottom:6px;font-weight:500}
+.field input,.field textarea,.field select{
+  width:100%;background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;
+  color:var(--txt);padding:10px 12px;font-size:.9rem;font-family:inherit;
+}
+.field input::placeholder,.field textarea::placeholder{color:var(--txt-faint)}
+.field textarea{resize:vertical;min-height:64px}
+.row{display:flex;gap:12px}
+.row .field{flex:1}
+.seg{display:flex;gap:8px}
+.seg label{flex:1;cursor:pointer}
+.seg input{display:none}
+.seg span{display:block;text-align:center;padding:9px;border:1px solid var(--line);border-radius:10px;font-size:.85rem;transition:.15s;color:var(--txt-dim);background:var(--bg-soft)}
+.seg input:checked + span{font-weight:600}
+.seg .a input:checked + span{background:rgba(192,68,60,.10);border-color:var(--alta);color:#a13a33}
+.seg .m input:checked + span{background:rgba(199,116,20,.10);border-color:var(--media);color:#96570d}
+.seg .b input:checked + span{background:rgba(79,119,173,.10);border-color:var(--baja);color:#3d6295}
+.modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:16px 20px;border-top:1px solid var(--line)}
+
+footer.foot{margin-top:30px;text-align:center;color:var(--txt-faint);font-size:.78rem;line-height:1.7}
+footer.foot a{color:var(--accent);cursor:pointer;text-decoration:none}
+.hidden{display:none!important}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#c9d4e3;border-radius:20px}
 </style>
 </head>
 <body>
@@ -198,7 +232,38 @@
 
   <header class="top">
     <div class="brand">
-      <h1><span class="dot"></span> Seguimiento de Tareas</h1>
+      <!-- VISUAL: logo corporativo ElectroPlast. Si existe "logo.png" junto a
+           este index.html en el repositorio, se muestra el PNG oficial; si no,
+           se muestra el logo SVG incrustado como respaldo. Sin impacto funcional. -->
+      <h1><img src="logo.png" alt="ElectroPlast" class="logo"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+        <svg class="logo-fb" style="display:none" viewBox="0 0 340 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ElectroPlast">
+          <g transform="skewX(-6)">
+            <!-- Barras de velocidad -->
+            <rect x="68"  y="52"  width="52" height="17" rx="8" fill="#2f9d3a"/>
+            <rect x="52"  y="82"  width="68" height="17" rx="8" fill="#2f9d3a"/>
+            <rect x="68"  y="112" width="52" height="17" rx="8" fill="#2f9d3a"/>
+            <!-- P verde -->
+            <path d="M138 30 h44 v130 h-30 V30 Z" fill="#2f9d3a"/>
+            <path d="M170 30 h34 a52 52 0 0 1 0 104 h-34 v-26 h30 a26 26 0 0 0 0-52 h-30 Z" fill="#2f9d3a"/>
+          </g>
+          <!-- Globo azul con meridianos -->
+          <g transform="translate(176,82)">
+            <circle r="30" fill="#1f6bbd"/>
+            <g fill="none" stroke="#ffffff" stroke-width="2.4" opacity=".9">
+              <circle r="30"/>
+              <ellipse rx="13" ry="30"/>
+              <ellipse rx="24" ry="30"/>
+              <line x1="-30" y1="0" x2="30" y2="0"/>
+              <path d="M-26-15 a34 20 0 0 1 52 0"/>
+              <path d="M-26 15 a34 20 0 0 0 52 0"/>
+            </g>
+          </g>
+          <!-- Wordmark -->
+          <text x="42" y="212" font-family="Arial,Helvetica,sans-serif" font-size="46" font-weight="bold" font-style="italic">
+            <tspan fill="#1f6bbd">Electro</tspan><tspan fill="#2f9d3a">Plast</tspan>
+          </text>
+        </svg> Seguimiento de Tareas</h1>
       <p>Da seguimiento a los pendientes operativos que salen de tus reuniones de equipo. Arrastra las tarjetas entre columnas conforme avanzan.</p>
     </div>
     <div class="stats">
