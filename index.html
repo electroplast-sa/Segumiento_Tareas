@@ -166,6 +166,16 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 .card.prio-baja{border-left-color:var(--baja)}
 .card .title{font-size:.94rem;font-weight:600;line-height:1.35;padding-right:20px;word-break:break-word;color:var(--txt)}
 .card .desc{font-size:.8rem;color:var(--txt-dim);margin-top:5px;line-height:1.4;word-break:break-word}
+/* Comentario en la tarjeta: bloque discreto, SIEMPRE visible pero recortado a
+   2 líneas con "…" para que nunca desborde el alto de la tarjeta. El texto
+   completo queda disponible en el tooltip (atributo title) y al abrir la tarjeta. */
+.card .coment{
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  font-size:.76rem;color:var(--txt-dim);line-height:1.35;margin-top:8px;
+  padding:6px 9px;background:var(--bg-soft);border:1px solid var(--line);
+  border-left:2px solid var(--accent);border-radius:8px;word-break:break-word;
+}
+.card .coment .q{color:var(--accent);font-weight:700;margin-right:3px}
 .card .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
 
 /* Chips: fondos tenues + texto oscuro legible (estado siempre con etiqueta) */
@@ -377,6 +387,10 @@ footer.foot a{color:var(--accent);cursor:pointer;text-decoration:none}
           <option value="completada">Completada</option>
         </select>
       </div>
+      <div class="field">
+        <label>Comentario (seguimiento)</label>
+        <textarea id="f-coment" placeholder="Avance, acuerdo o nota de seguimiento…" maxlength="300"></textarea>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn ghost del hidden" id="btn-delete" style="color:var(--danger)">Eliminar</button>
@@ -476,7 +490,8 @@ function normalize(raw){
       prio:    ['alta','media','baja'].includes(String(r.prio||'').toLowerCase())?String(r.prio).toLowerCase():'media',
       meet:    r.meet||'',
       meetdate:serialToISO(r.meetdate),
-      status:  STATUS_IN[String(r.status||'').toLowerCase()]||'pendiente'
+      status:  STATUS_IN[String(r.status||'').toLowerCase()]||'pendiente',
+      comentario: r.Comentario||r.comentario||''
     }));
 }
 
@@ -497,7 +512,8 @@ function buildPayload(t,deletedFlag){
     meetdate: t.meetdate||'',
     status:   STATUS_OUT[t.status]||t.status,  // pendiente | proceso | finalizada
     updated_by: getUser(),
-    deleted:  deletedFlag||'no'                // no | si
+    deleted:  deletedFlag||'no',               // no | si
+    Comentario: t.comentario||''               // nota de seguimiento (columna Excel)
   };
 }
 async function syncToExcel(payload){
@@ -662,6 +678,7 @@ function card(t){
     '</div>'+
     '<div class="title">'+esc(t.title)+'</div>'+
     (t.desc?'<div class="desc">'+esc(t.desc)+'</div>':'')+
+    (t.comentario?'<div class="coment" title="'+esc(t.comentario)+'"><span class="q">💬</span>'+esc(t.comentario)+'</div>':'')+
     '<div class="meta">'+meta+'</div>';
 
   el.querySelector('.edit').addEventListener('click',e=>{e.stopPropagation();openModal(t);});
@@ -709,6 +726,7 @@ function openModal(t){
   $('#f-meet').value=t?(t.meet||''):'';
   $('#f-meetdate').value=t?(t.meetdate||''):'';
   $('#f-status').value=t?t.status:'pendiente';
+  $('#f-coment').value=t?(t.comentario||''):'';
   document.querySelectorAll('input[name="prio"]').forEach(r=>r.checked=(r.value===(t?t.prio:'media')));
   $('#btn-delete').classList.toggle('hidden',!t);
   $('#overlay').classList.add('open');
@@ -728,6 +746,7 @@ function saveTask(){
     meet:$('#f-meet').value.trim(),
     meetdate:$('#f-meetdate').value,
     status:$('#f-status').value,
+    comentario:$('#f-coment').value.trim(),
   };
   let t;
   if(editingId){
@@ -766,7 +785,8 @@ function importJSON(file){
         id:t.id||uid(),title:String(t.title),desc:t.desc||'',resp:t.resp||'',
         due:t.due||'',prio:['alta','media','baja'].includes(t.prio)?t.prio:'media',
         meet:t.meet||'',meetdate:t.meetdate||'',
-        status:['pendiente','proceso','completada'].includes(t.status)?t.status:'pendiente'
+        status:['pendiente','proceso','completada'].includes(t.status)?t.status:'pendiente',
+        comentario:t.comentario||t.Comentario||''
       }));
       if(confirm('¿Reemplazar el tablero actual con '+clean.length+' tareas del archivo?\n(Cancela para combinar en su lugar)')){
         tasks=clean;
